@@ -115,3 +115,62 @@ def test_magic_link_verify_url_encodes_token(client):
 def test_empty_url_raises():
     with pytest.raises(ValueError):
         TzamClient(Config(url=""))
+
+
+# get_auth_methods is the client-side half of the silent-by-design
+# forgot-password flow. /auth/forgot-password returns 204 even when
+# the password method is disabled for the app (to avoid enumeration);
+# callers must consult /auth/app-config to decide what UI to render.
+def test_get_auth_methods_queries_app_config_with_client_id(httpx_mock, client):
+    httpx_mock.add_response(
+        url="https://idp.test/auth/app-config?client_id=cid",
+        method="GET",
+        json={
+            "clientId": "cid",
+            "active": True,
+            "methods": {
+                "password": True,
+                "magicLink": False,
+                "otp": False,
+                "oauth": {"github": False, "google": True},
+            },
+        },
+    )
+    cfg = client.get_auth_methods()
+    assert cfg.client_id == "cid"
+    assert cfg.active is True
+    assert cfg.methods.password is True
+    assert cfg.methods.magic_link is False
+    assert cfg.methods.oauth.google is True
+    assert cfg.methods.oauth.github is False
+
+
+def test_get_auth_methods_reports_inactive_app(httpx_mock, client):
+    httpx_mock.add_response(
+        url="https://idp.test/auth/app-config?client_id=cid",
+        method="GET",
+        json={
+            "clientId": "cid",
+            "active": False,
+            "methods": {
+                "password": False,
+                "magicLink": False,
+                "otp": False,
+                "oauth": {"github": False, "google": False},
+            },
+        },
+    )
+    cfg = client.get_auth_methods()
+    assert cfg.active is False
+    assert cfg.methods.password is False
+
+
+def test_get_auth_methods_raises_on_server_error(httpx_mock, client):
+    httpx_mock.add_response(
+        url="https://idp.test/auth/app-config?client_id=cid",
+        method="GET",
+        status_code=500,
+        json={"message": "Upstream unavailable"},
+    )
+    with pytest.raises(TzamError):
+        client.get_auth_methods()

@@ -12,7 +12,7 @@ from urllib.parse import quote
 import httpx
 
 from ._errors import raise_api_error
-from ._types import Config, LoginResult, TokenPayload, User
+from ._types import AppConfig, AppMethods, Config, LoginResult, OAuthMethods, TokenPayload, User
 
 
 def _parse_login_result(data: dict[str, Any]) -> LoginResult:
@@ -21,6 +21,24 @@ def _parse_login_result(data: dict[str, Any]) -> LoginResult:
         access_token=str(data.get("accessToken", "")),
         refresh_token=str(data.get("refreshToken", "")),
         user=User(id=str(u.get("id", "")), email=str(u.get("email", "")), name=str(u.get("name", ""))),
+    )
+
+
+def _parse_app_config(data: dict[str, Any]) -> AppConfig:
+    m = data.get("methods") or {}
+    o = m.get("oauth") or {}
+    return AppConfig(
+        client_id=str(data.get("clientId", "")),
+        active=bool(data.get("active", False)),
+        methods=AppMethods(
+            password=bool(m.get("password", False)),
+            magic_link=bool(m.get("magicLink", False)),
+            otp=bool(m.get("otp", False)),
+            oauth=OAuthMethods(
+                github=bool(o.get("github", False)),
+                google=bool(o.get("google", False)),
+            ),
+        ),
     )
 
 
@@ -161,7 +179,28 @@ class TzamClient:
             "newPassword": new_password,
         })
 
+    def get_auth_methods(self) -> AppConfig:
+        """Probe which auth methods are currently enabled for this app.
+
+        Use this before rendering the auth UI — ``forgot_password`` (and
+        other silent auth-email flows) always return 204, even when the
+        method is disabled for the app, to avoid leaking which methods
+        the app exposes. This endpoint is the only non-leaky way to find
+        out.
+        """
+        path = f"/auth/app-config?client_id={quote(self._cfg.client_id, safe='')}"
+        return _parse_app_config(self._get(path))
+
     # ── internals ────────────────────────────────────────────────
+
+    def _get(self, path: str) -> dict[str, Any]:
+        response = self._http.get(self._cfg.url + path)
+        _raise_for_status(response)
+        try:
+            data = response.json()
+        except ValueError as exc:
+            raise RuntimeError(f"tzam: invalid JSON from {path}") from exc
+        return data if isinstance(data, dict) else {}
 
     def _post(
         self,
@@ -283,6 +322,20 @@ class AsyncTzamClient:
             "token": token,
             "newPassword": new_password,
         })
+
+    async def get_auth_methods(self) -> AppConfig:
+        """Async variant of :meth:`TzamClient.get_auth_methods`."""
+        path = f"/auth/app-config?client_id={quote(self._cfg.client_id, safe='')}"
+        return _parse_app_config(await self._get(path))
+
+    async def _get(self, path: str) -> dict[str, Any]:
+        response = await self._http.get(self._cfg.url + path)
+        _raise_for_status(response)
+        try:
+            data = response.json()
+        except ValueError as exc:
+            raise RuntimeError(f"tzam: invalid JSON from {path}") from exc
+        return data if isinstance(data, dict) else {}
 
     async def _post(
         self,

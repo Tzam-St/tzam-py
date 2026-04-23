@@ -31,7 +31,7 @@ from ._errors import (
     AuthUserNotRegistered,
     TzamError,
 )
-from ._types import Config, LoginResult, TokenPayload, User
+from ._types import AppConfig, AppMethods, Config, LoginResult, OAuthMethods, TokenPayload, User
 
 __version__ = "0.1.0"
 
@@ -44,6 +44,9 @@ __all__ = [
     "User",
     "LoginResult",
     "TokenPayload",
+    "AppConfig",
+    "AppMethods",
+    "OAuthMethods",
     # errors
     "TzamError",
     "AuthInvalidCredentials",

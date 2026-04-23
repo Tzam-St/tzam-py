@@ -6,7 +6,7 @@ JSON <-> dataclass conversion is handled explicitly in _client.py.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Literal
 
 
@@ -58,3 +58,36 @@ class TokenPayload:
 
 
 SameSite = Literal["strict", "lax", "none"]
+
+
+@dataclass(frozen=True, slots=True)
+class OAuthMethods:
+    """Which third-party OAuth providers are currently enabled for the app."""
+
+    github: bool = False
+    google: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class AppMethods:
+    """Which auth entry points are active for the app."""
+
+    password: bool = False
+    magic_link: bool = False
+    otp: bool = False
+    oauth: OAuthMethods = field(default_factory=OAuthMethods)
+
+
+@dataclass(frozen=True, slots=True)
+class AppConfig:
+    """Returned by ``get_auth_methods``.
+
+    Lets the client decide what auth UI to render without relying on
+    ``forgot_password`` / magic-link status codes — those endpoints are
+    silent by design so they can't be probed to enumerate which methods
+    the app exposes.
+    """
+
+    client_id: str
+    active: bool
+    methods: AppMethods

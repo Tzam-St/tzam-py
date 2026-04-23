@@ -43,3 +43,26 @@ async def test_async_login_invalid_credentials(httpx_mock, client):
     with pytest.raises(AuthInvalidCredentials):
         await client.login("a@b", "pw")
     await client.aclose()
+
+
+async def test_async_get_auth_methods_parses_response(httpx_mock, client):
+    httpx_mock.add_response(
+        url="https://idp.test/auth/app-config?client_id=cid",
+        method="GET",
+        json={
+            "clientId": "cid",
+            "active": True,
+            "methods": {
+                "password": False,
+                "magicLink": True,
+                "otp": False,
+                "oauth": {"github": True, "google": False},
+            },
+        },
+    )
+    cfg = await client.get_auth_methods()
+    assert cfg.active is True
+    assert cfg.methods.magic_link is True
+    assert cfg.methods.oauth.github is True
+    assert cfg.methods.password is False
+    await client.aclose()
