@@ -11,7 +11,7 @@ from urllib.parse import quote
 
 import httpx
 
-from ._errors import raise_api_error
+from ._errors import AppInactiveError, PasswordMethodDisabledError, raise_api_error
 from ._types import AppConfig, AppMethods, Config, LoginResult, OAuthMethods, TokenPayload, User
 
 
@@ -163,7 +163,18 @@ class TzamClient:
         (per-org branding, custom from-address). Server intentionally returns
         204 even when the email does not exist — never reveals whether an
         account is registered.
+
+        Because the IdP also returns 204 when the app is inactive or has the
+        email/password method disabled, this method probes ``/auth/app-config``
+        first and raises :class:`AppInactiveError` or
+        :class:`PasswordMethodDisabledError` — turning what would be a silent
+        no-op into an actionable error.
         """
+        cfg = self.get_auth_methods()
+        if not cfg.active:
+            raise AppInactiveError(self._cfg.client_id)
+        if not cfg.methods.password:
+            raise PasswordMethodDisabledError(self._cfg.client_id)
         self._post("/auth/forgot-password", json={
             "email": email,
             "clientId": self._cfg.client_id,
@@ -311,6 +322,11 @@ class AsyncTzamClient:
 
     async def forgot_password(self, email: str) -> None:
         """Async variant of :meth:`TzamClient.forgot_password`."""
+        cfg = await self.get_auth_methods()
+        if not cfg.active:
+            raise AppInactiveError(self._cfg.client_id)
+        if not cfg.methods.password:
+            raise PasswordMethodDisabledError(self._cfg.client_id)
         await self._post("/auth/forgot-password", json={
             "email": email,
             "clientId": self._cfg.client_id,

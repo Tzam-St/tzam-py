@@ -81,6 +81,35 @@ class AuthRefreshFailed(TzamError):
     """Refresh attempt failed for any reason."""
 
 
+# ── Local-only errors ────────────────────────────────────────────────
+# These are NOT raised by the IdP — the IdP returns 204 in both cases to
+# avoid leaking configuration. The SDK probes /auth/app-config first and
+# raises these to give callers an actionable error instead of a silent
+# no-op.
+
+
+class AppInactiveError(TzamError):
+    """The application (client_id) is marked inactive in the IdP."""
+
+    def __init__(self, client_id: str = ""):
+        super().__init__(
+            f"application client_id={client_id} is inactive" if client_id else "application is inactive",
+        )
+        self.client_id = client_id
+
+
+class PasswordMethodDisabledError(TzamError):
+    """The email/password auth method is disabled for this application."""
+
+    def __init__(self, client_id: str = ""):
+        super().__init__(
+            f"email/password authentication is disabled for client_id={client_id}"
+            if client_id
+            else "email/password authentication is disabled for this application",
+        )
+        self.client_id = client_id
+
+
 # Map IdP error codes to exception classes. Unlisted codes bubble as
 # generic TzamError so the SDK stays forward-compatible with new codes.
 _CODE_TO_EXC: dict[str, type[TzamError]] = {

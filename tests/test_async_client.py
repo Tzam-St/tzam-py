@@ -4,7 +4,14 @@ from __future__ import annotations
 
 import pytest
 
-from tzam import AUTH_INVALID_CREDENTIALS, AsyncTzamClient, AuthInvalidCredentials, Config
+from tzam import (
+    AUTH_INVALID_CREDENTIALS,
+    AppInactiveError,
+    AsyncTzamClient,
+    AuthInvalidCredentials,
+    Config,
+    PasswordMethodDisabledError,
+)
 
 
 @pytest.fixture
@@ -65,4 +72,54 @@ async def test_async_get_auth_methods_parses_response(httpx_mock, client):
     assert cfg.methods.magic_link is True
     assert cfg.methods.oauth.github is True
     assert cfg.methods.password is False
+    await client.aclose()
+
+
+def _async_app_config(*, active: bool = True, password: bool = True) -> dict:
+    return {
+        "clientId": "cid",
+        "active": active,
+        "methods": {
+            "password": password,
+            "magicLink": False,
+            "otp": False,
+            "oauth": {"github": False, "google": False},
+        },
+    }
+
+
+async def test_async_forgot_password_probes_then_posts(httpx_mock, client):
+    httpx_mock.add_response(
+        url="https://idp.test/auth/app-config?client_id=cid",
+        method="GET",
+        json=_async_app_config(),
+    )
+    httpx_mock.add_response(
+        url="https://idp.test/auth/forgot-password",
+        method="POST",
+        status_code=204,
+    )
+    await client.forgot_password("user@example.com")
+    await client.aclose()
+
+
+async def test_async_forgot_password_raises_password_disabled(httpx_mock, client):
+    httpx_mock.add_response(
+        url="https://idp.test/auth/app-config?client_id=cid",
+        method="GET",
+        json=_async_app_config(password=False),
+    )
+    with pytest.raises(PasswordMethodDisabledError):
+        await client.forgot_password("user@example.com")
+    await client.aclose()
+
+
+async def test_async_forgot_password_raises_app_inactive(httpx_mock, client):
+    httpx_mock.add_response(
+        url="https://idp.test/auth/app-config?client_id=cid",
+        method="GET",
+        json=_async_app_config(active=False),
+    )
+    with pytest.raises(AppInactiveError):
+        await client.forgot_password("user@example.com")
     await client.aclose()

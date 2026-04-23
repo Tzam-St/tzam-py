@@ -21,6 +21,7 @@ from ._errors import (
     AUTH_TOKEN_EXPIRED,
     AUTH_TOKEN_INVALID,
     AUTH_USER_NOT_REGISTERED,
+    AppInactiveError,
     AuthAccountInactive,
     AuthEmailExists,
     AuthInvalidCredentials,
@@ -29,6 +30,7 @@ from ._errors import (
     AuthTokenExpired,
     AuthTokenInvalid,
     AuthUserNotRegistered,
+    PasswordMethodDisabledError,
     TzamError,
 )
 from ._types import AppConfig, AppMethods, Config, LoginResult, OAuthMethods, TokenPayload, User
@@ -57,6 +59,8 @@ __all__ = [
     "AuthTokenExpired",
     "AuthSessionRevoked",
     "AuthRefreshFailed",
+    "AppInactiveError",
+    "PasswordMethodDisabledError",
     # error codes
     "AUTH_INVALID_CREDENTIALS",
     "AUTH_ACCOUNT_INACTIVE",

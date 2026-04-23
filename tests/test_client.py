@@ -7,8 +7,10 @@ import pytest
 from tzam import (
     AUTH_INVALID_CREDENTIALS,
     AUTH_TOKEN_EXPIRED,
+    AppInactiveError,
     AuthInvalidCredentials,
     Config,
+    PasswordMethodDisabledError,
     TzamClient,
     TzamError,
 )
@@ -174,3 +176,55 @@ def test_get_auth_methods_raises_on_server_error(httpx_mock, client):
     )
     with pytest.raises(TzamError):
         client.get_auth_methods()
+
+
+# forgot_password probes /auth/app-config first so the SDK can surface
+# a typed error instead of the silent 204 the IdP returns when the flow
+# would be dropped (app inactive or email/password disabled).
+def _app_config_payload(*, active: bool = True, password: bool = True) -> dict:
+    return {
+        "clientId": "cid",
+        "active": active,
+        "methods": {
+            "password": password,
+            "magicLink": False,
+            "otp": False,
+            "oauth": {"github": False, "google": False},
+        },
+    }
+
+
+def test_forgot_password_probes_app_config_and_posts_when_enabled(httpx_mock, client):
+    httpx_mock.add_response(
+        url="https://idp.test/auth/app-config?client_id=cid",
+        method="GET",
+        json=_app_config_payload(),
+    )
+    httpx_mock.add_response(
+        url="https://idp.test/auth/forgot-password",
+        method="POST",
+        status_code=204,
+    )
+    client.forgot_password("user@example.com")
+
+
+def test_forgot_password_raises_password_disabled(httpx_mock, client):
+    httpx_mock.add_response(
+        url="https://idp.test/auth/app-config?client_id=cid",
+        method="GET",
+        json=_app_config_payload(password=False),
+    )
+    with pytest.raises(PasswordMethodDisabledError):
+        client.forgot_password("user@example.com")
+    # /auth/forgot-password must NOT be reached — pytest-httpx asserts that
+    # no unmatched requests were made at teardown.
+
+
+def test_forgot_password_raises_app_inactive(httpx_mock, client):
+    httpx_mock.add_response(
+        url="https://idp.test/auth/app-config?client_id=cid",
+        method="GET",
+        json=_app_config_payload(active=False),
+    )
+    with pytest.raises(AppInactiveError):
+        client.forgot_password("user@example.com")
