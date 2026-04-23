@@ -10,6 +10,8 @@ from tzam import (
     AsyncTzamClient,
     AuthInvalidCredentials,
     Config,
+    MagicLinkMethodDisabledError,
+    OtpMethodDisabledError,
     PasswordMethodDisabledError,
 )
 
@@ -75,14 +77,20 @@ async def test_async_get_auth_methods_parses_response(httpx_mock, client):
     await client.aclose()
 
 
-def _async_app_config(*, active: bool = True, password: bool = True) -> dict:
+def _async_app_config(
+    *,
+    active: bool = True,
+    password: bool = True,
+    magic_link: bool = True,
+    otp: bool = True,
+) -> dict:
     return {
         "clientId": "cid",
         "active": active,
         "methods": {
             "password": password,
-            "magicLink": False,
-            "otp": False,
+            "magicLink": magic_link,
+            "otp": otp,
             "oauth": {"github": False, "google": False},
         },
     }
@@ -122,4 +130,56 @@ async def test_async_forgot_password_raises_app_inactive(httpx_mock, client):
     )
     with pytest.raises(AppInactiveError):
         await client.forgot_password("user@example.com")
+    await client.aclose()
+
+
+async def test_async_request_magic_link_probes_then_posts(httpx_mock, client):
+    httpx_mock.add_response(
+        url="https://idp.test/auth/app-config?client_id=cid",
+        method="GET",
+        json=_async_app_config(),
+    )
+    httpx_mock.add_response(
+        url="https://idp.test/auth/magic-link",
+        method="POST",
+        status_code=204,
+    )
+    await client.request_magic_link("user@example.com", "/after")
+    await client.aclose()
+
+
+async def test_async_request_magic_link_raises_when_disabled(httpx_mock, client):
+    httpx_mock.add_response(
+        url="https://idp.test/auth/app-config?client_id=cid",
+        method="GET",
+        json=_async_app_config(magic_link=False),
+    )
+    with pytest.raises(MagicLinkMethodDisabledError):
+        await client.request_magic_link("user@example.com")
+    await client.aclose()
+
+
+async def test_async_request_otp_probes_then_posts(httpx_mock, client):
+    httpx_mock.add_response(
+        url="https://idp.test/auth/app-config?client_id=cid",
+        method="GET",
+        json=_async_app_config(),
+    )
+    httpx_mock.add_response(
+        url="https://idp.test/auth/otp",
+        method="POST",
+        status_code=204,
+    )
+    await client.request_otp("user@example.com")
+    await client.aclose()
+
+
+async def test_async_request_otp_raises_when_disabled(httpx_mock, client):
+    httpx_mock.add_response(
+        url="https://idp.test/auth/app-config?client_id=cid",
+        method="GET",
+        json=_async_app_config(otp=False),
+    )
+    with pytest.raises(OtpMethodDisabledError):
+        await client.request_otp("user@example.com")
     await client.aclose()

@@ -30,12 +30,14 @@ from ._errors import (
     AuthTokenExpired,
     AuthTokenInvalid,
     AuthUserNotRegistered,
+    MagicLinkMethodDisabledError,
+    OtpMethodDisabledError,
     PasswordMethodDisabledError,
     TzamError,
 )
 from ._types import AppConfig, AppMethods, Config, LoginResult, OAuthMethods, TokenPayload, User
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 
 __all__ = [
     # client
@@ -61,6 +63,8 @@ __all__ = [
     "AuthRefreshFailed",
     "AppInactiveError",
     "PasswordMethodDisabledError",
+    "MagicLinkMethodDisabledError",
+    "OtpMethodDisabledError",
     # error codes
     "AUTH_INVALID_CREDENTIALS",
     "AUTH_ACCOUNT_INACTIVE",

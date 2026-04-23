@@ -10,6 +10,8 @@ from tzam import (
     AppInactiveError,
     AuthInvalidCredentials,
     Config,
+    MagicLinkMethodDisabledError,
+    OtpMethodDisabledError,
     PasswordMethodDisabledError,
     TzamClient,
     TzamError,
@@ -178,17 +180,23 @@ def test_get_auth_methods_raises_on_server_error(httpx_mock, client):
         client.get_auth_methods()
 
 
-# forgot_password probes /auth/app-config first so the SDK can surface
-# a typed error instead of the silent 204 the IdP returns when the flow
-# would be dropped (app inactive or email/password disabled).
-def _app_config_payload(*, active: bool = True, password: bool = True) -> dict:
+# forgot_password / request_magic_link / request_otp probe /auth/app-config
+# first so the SDK can surface a typed error instead of the silent 204 the
+# IdP returns when the respective flow would be dropped.
+def _app_config_payload(
+    *,
+    active: bool = True,
+    password: bool = True,
+    magic_link: bool = True,
+    otp: bool = True,
+) -> dict:
     return {
         "clientId": "cid",
         "active": active,
         "methods": {
             "password": password,
-            "magicLink": False,
-            "otp": False,
+            "magicLink": magic_link,
+            "otp": otp,
             "oauth": {"github": False, "google": False},
         },
     }
@@ -228,3 +236,51 @@ def test_forgot_password_raises_app_inactive(httpx_mock, client):
     )
     with pytest.raises(AppInactiveError):
         client.forgot_password("user@example.com")
+
+
+def test_request_magic_link_probes_then_posts(httpx_mock, client):
+    httpx_mock.add_response(
+        url="https://idp.test/auth/app-config?client_id=cid",
+        method="GET",
+        json=_app_config_payload(),
+    )
+    httpx_mock.add_response(
+        url="https://idp.test/auth/magic-link",
+        method="POST",
+        status_code=204,
+    )
+    client.request_magic_link("user@example.com", "/after")
+
+
+def test_request_magic_link_raises_when_disabled(httpx_mock, client):
+    httpx_mock.add_response(
+        url="https://idp.test/auth/app-config?client_id=cid",
+        method="GET",
+        json=_app_config_payload(magic_link=False),
+    )
+    with pytest.raises(MagicLinkMethodDisabledError):
+        client.request_magic_link("user@example.com")
+
+
+def test_request_otp_probes_then_posts(httpx_mock, client):
+    httpx_mock.add_response(
+        url="https://idp.test/auth/app-config?client_id=cid",
+        method="GET",
+        json=_app_config_payload(),
+    )
+    httpx_mock.add_response(
+        url="https://idp.test/auth/otp",
+        method="POST",
+        status_code=204,
+    )
+    client.request_otp("user@example.com")
+
+
+def test_request_otp_raises_when_disabled(httpx_mock, client):
+    httpx_mock.add_response(
+        url="https://idp.test/auth/app-config?client_id=cid",
+        method="GET",
+        json=_app_config_payload(otp=False),
+    )
+    with pytest.raises(OtpMethodDisabledError):
+        client.request_otp("user@example.com")

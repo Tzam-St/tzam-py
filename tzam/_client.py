@@ -11,7 +11,13 @@ from urllib.parse import quote
 
 import httpx
 
-from ._errors import AppInactiveError, PasswordMethodDisabledError, raise_api_error
+from ._errors import (
+    AppInactiveError,
+    MagicLinkMethodDisabledError,
+    OtpMethodDisabledError,
+    PasswordMethodDisabledError,
+    raise_api_error,
+)
 from ._types import AppConfig, AppMethods, Config, LoginResult, OAuthMethods, TokenPayload, User
 
 
@@ -138,6 +144,11 @@ class TzamClient:
     # ── Magic link / OTP ──────────────────────────────────────────
 
     def request_magic_link(self, email: str, redirect: str | None = None) -> None:
+        cfg = self.get_auth_methods()
+        if not cfg.active:
+            raise AppInactiveError(self._cfg.client_id)
+        if not cfg.methods.magic_link:
+            raise MagicLinkMethodDisabledError(self._cfg.client_id)
         self._post("/auth/magic-link", json={
             "email": email,
             "redirect": redirect,
@@ -145,6 +156,11 @@ class TzamClient:
         })
 
     def request_otp(self, email: str) -> None:
+        cfg = self.get_auth_methods()
+        if not cfg.active:
+            raise AppInactiveError(self._cfg.client_id)
+        if not cfg.methods.otp:
+            raise OtpMethodDisabledError(self._cfg.client_id)
         self._post("/auth/otp", json={"email": email, "client_id": self._cfg.client_id})
 
     def verify_otp(self, email: str, code: str) -> LoginResult:
@@ -303,6 +319,11 @@ class AsyncTzamClient:
         )
 
     async def request_magic_link(self, email: str, redirect: str | None = None) -> None:
+        cfg = await self.get_auth_methods()
+        if not cfg.active:
+            raise AppInactiveError(self._cfg.client_id)
+        if not cfg.methods.magic_link:
+            raise MagicLinkMethodDisabledError(self._cfg.client_id)
         await self._post("/auth/magic-link", json={
             "email": email,
             "redirect": redirect,
@@ -310,6 +331,11 @@ class AsyncTzamClient:
         })
 
     async def request_otp(self, email: str) -> None:
+        cfg = await self.get_auth_methods()
+        if not cfg.active:
+            raise AppInactiveError(self._cfg.client_id)
+        if not cfg.methods.otp:
+            raise OtpMethodDisabledError(self._cfg.client_id)
         await self._post("/auth/otp", json={"email": email, "client_id": self._cfg.client_id})
 
     async def verify_otp(self, email: str, code: str) -> LoginResult:

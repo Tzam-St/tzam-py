@@ -110,6 +110,30 @@ class PasswordMethodDisabledError(TzamError):
         self.client_id = client_id
 
 
+class MagicLinkMethodDisabledError(TzamError):
+    """The magic-link auth method is disabled for this application."""
+
+    def __init__(self, client_id: str = ""):
+        super().__init__(
+            f"magic-link authentication is disabled for client_id={client_id}"
+            if client_id
+            else "magic-link authentication is disabled for this application",
+        )
+        self.client_id = client_id
+
+
+class OtpMethodDisabledError(TzamError):
+    """The OTP auth method is disabled for this application."""
+
+    def __init__(self, client_id: str = ""):
+        super().__init__(
+            f"OTP authentication is disabled for client_id={client_id}"
+            if client_id
+            else "OTP authentication is disabled for this application",
+        )
+        self.client_id = client_id
+
+
 # Map IdP error codes to exception classes. Unlisted codes bubble as
 # generic TzamError so the SDK stays forward-compatible with new codes.
 _CODE_TO_EXC: dict[str, type[TzamError]] = {
