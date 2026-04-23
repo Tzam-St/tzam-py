@@ -135,6 +135,32 @@ class TzamClient:
     def magic_link_verify_url(self, token: str) -> str:
         return f"{self._cfg.url}/auth/magic-link/verify?token={quote(token, safe='')}"
 
+    # ── Password recovery ────────────────────────────────────────
+
+    def forgot_password(self, email: str) -> None:
+        """Request a password-reset email.
+
+        The Tzam IdP routes the email through the calling app's
+        organization-scoped email provider when ``client_id`` is configured
+        (per-org branding, custom from-address). Server intentionally returns
+        204 even when the email does not exist — never reveals whether an
+        account is registered.
+        """
+        self._post("/auth/forgot-password", json={
+            "email": email,
+            "clientId": self._cfg.client_id,
+        })
+
+    def reset_password(self, token: str, new_password: str) -> None:
+        """Complete a password reset using the token from ``forgot_password``.
+
+        Raises ``TzamError`` (or subclass) on invalid/expired token.
+        """
+        self._post("/auth/reset-password", json={
+            "token": token,
+            "newPassword": new_password,
+        })
+
     # ── internals ────────────────────────────────────────────────
 
     def _post(
@@ -241,6 +267,22 @@ class AsyncTzamClient:
 
     def magic_link_verify_url(self, token: str) -> str:
         return f"{self._cfg.url}/auth/magic-link/verify?token={quote(token, safe='')}"
+
+    # ── Password recovery ────────────────────────────────────────
+
+    async def forgot_password(self, email: str) -> None:
+        """Async variant of :meth:`TzamClient.forgot_password`."""
+        await self._post("/auth/forgot-password", json={
+            "email": email,
+            "clientId": self._cfg.client_id,
+        })
+
+    async def reset_password(self, token: str, new_password: str) -> None:
+        """Async variant of :meth:`TzamClient.reset_password`."""
+        await self._post("/auth/reset-password", json={
+            "token": token,
+            "newPassword": new_password,
+        })
 
     async def _post(
         self,
