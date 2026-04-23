@@ -1,6 +1,6 @@
 [project]
 name = "tzam"
-version = "0.2.0"
+version = "0.3.0"
 description = "Official Python client for the Tzam Identity Provider"
 readme = "README.md"
 license = "MIT"
